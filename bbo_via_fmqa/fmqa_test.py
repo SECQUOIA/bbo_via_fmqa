@@ -10,7 +10,7 @@ from fmqa import FMBQM
 # Helper file
 import read_grid
 
-path = '/Users/woosik/Documents/Purdue/Research/bbo_via_fmqa/dataset/compl_enum_cstr_17_baron_hull.csv' # Adjust the path as needed
+path = '/path_to_dataset'
 grid, obj_min, obj_max, x_bound, y_bound = read_grid.load_grid(filename=path)
 print(f"Grid loaded: {len(grid)} points, x in [0,{x_bound}], y in [0,{y_bound}]")
 print(f"Objective range: [{obj_min}, {obj_max}]")
@@ -59,6 +59,7 @@ best_coord = [p for p in init_points if grid[p] == best_val_raw][0]
 print(f"Initial best = {best_val_raw} at {best_coord}")
 
 history = [best_val_raw]
+print(init_points)
 
 # --- FMQA loop ---
 for t in range(num_cycles):
