@@ -1,4 +1,3 @@
-
 import read_grid
 import numpy as np
 from qci_client import QciClient
@@ -6,6 +5,157 @@ from math import isfinite
 
 # QCI_TOKEN = 'your_api_token'
 # QCI_API_URL = 'your_qci_api_url'
+
+
+def solve_surrogate_dwave(
+    fm_model,
+    x_bound,
+    y_bound,
+    evaluated_points,
+    grid,
+):
+    """
+    Propose the next (x, y) point using a D-Wave hybrid solver
+    on the FM-based BQM. If D-Wave fails to produce a *new*
+    valid candidate, fall back to BQM-energy-based search over
+    remaining grid points.
+
+    Args:
+        fm_model: trained FMBQM (subclass of dimod.BinaryQuadraticModel) or
+                  any object with .linear, .quadratic, .offset and .energy().
+        x_bound (int): max x index in the grid.
+        y_bound (int): max y index in the grid.
+        evaluated_points (set): set of (x, y) already evaluated.
+        grid (dict): mapping (x, y) -> objective value (float or NaN).
+
+    Returns:
+        (px, py): next candidate point, or (None, None) if nothing is left.
+    """
+    import dimod
+    from dwave.system import LeapHybridSampler
+
+    # ---------- 0. Build a BQM from fm_model (if needed) ----------
+    try:
+        if isinstance(fm_model, dimod.BinaryQuadraticModel):
+            bqm = fm_model
+        else:
+            # Assume fm_model has .linear, .quadratic, .offset like FMBQM
+            linear_raw = getattr(fm_model, "linear", {})
+            quad_raw = getattr(fm_model, "quadratic", {})
+            offset = float(getattr(fm_model, "offset", 0.0))
+
+            linear = {int(i): float(h) for i, h in linear_raw.items()}
+            quadratic = {(int(i), int(j)): float(J)
+                         for (i, j), J in quad_raw.items()}
+
+            # binary variables (0/1) because coord_bits uses 0/1 bits
+            bqm = dimod.BinaryQuadraticModel(linear, quadratic, offset, dimod.BINARY)
+    except Exception as e:
+        print(f"[solve_surrogate_dwave] Error building BQM from fm_model: {e}")
+        return None, None
+
+    # ---------- 1. Try D-Wave hybrid sampler ----------
+    candidates = []
+
+    try:
+        sampler = LeapHybridSampler()
+        sampleset = sampler.sample(bqm)
+    except Exception as e:
+        print(f"[solve_surrogate_dwave] Error calling LeapHybridSampler: {e}")
+        sampleset = None
+
+    if sampleset is not None and len(sampleset):
+        for sample, energy in sampleset.data(['sample', 'energy']):
+            # sample: {var_label: value, ...}
+            bitlist = []
+            for i in sorted(sample.keys()):
+                v = sample[i]
+                # handle SPIN or BINARY just in case
+                if v in (-1, 1):
+                    bit = 0 if v == -1 else 1
+                else:
+                    bit = int(v)
+                bitlist.append(bit)
+
+            bitstring = "".join(str(b) for b in bitlist)
+
+            # Decode bits -> (x, y) using your existing convention
+            try:
+                cand_x, cand_y = read_grid.bits_to_int(bitstring, lsb_first=False)
+            except Exception:
+                continue
+
+            # Bounds
+            if not (0 <= cand_x <= x_bound and 0 <= cand_y <= y_bound):
+                continue
+            # Must exist in grid
+            if (cand_x, cand_y) not in grid:
+                continue
+            # Must not have NaN objective
+            val = grid[(cand_x, cand_y)]
+            if val is None or not np.isfinite(val):
+                continue
+            # Must be a new point
+            if (cand_x, cand_y) in evaluated_points:
+                continue
+
+            candidates.append((cand_x, cand_y, energy))
+
+    if candidates:
+        # choose the candidate with the lowest energy
+        cand_x, cand_y, _ = min(candidates, key=lambda t: t[2])
+        print(f"[solve_surrogate_dwave] New candidate from D-Wave: ({cand_x}, {cand_y})")
+        return cand_x, cand_y
+
+    print("[solve_surrogate_dwave] No valid *new* samples from D-Wave. "
+          "Falling back to BQM-energy-based search.")
+
+    # ---------- 2. Fallback: BQM-energy-based search over remaining grid ----------
+    remaining_points = []
+    remaining_bitvectors = []
+
+    for (x, y), val in grid.items():
+        if (x, y) in evaluated_points:
+            continue
+        if not np.isfinite(val):
+            continue
+        # (optional) keep triangular symmetry; comment out if you don't want this
+        # if x < y:
+        #     continue
+
+        remaining_points.append((x, y))
+        bitstring = read_grid.coord_bits(x, y, x_bound, y_bound)
+        bits = [int(c) for c in bitstring]
+        remaining_bitvectors.append(bits)
+
+    if not remaining_points:
+        print("[solve_surrogate_dwave] No remaining unevaluated grid points.")
+        return None, None
+
+    try:
+        # make sure number of variables matches
+        num_vars = len(bqm.variables)
+        energies = []
+        for bits in remaining_bitvectors:
+            if len(bits) < num_vars:
+                # pad with zeros if needed
+                bits = list(bits) + [0] * (num_vars - len(bits))
+            elif len(bits) > num_vars:
+                bits = bits[:num_vars]
+
+            sample = {i: int(bits[i]) for i in range(num_vars)}
+            e = bqm.energy(sample)
+            energies.append(e)
+
+        energies = np.array(energies, dtype=float)
+        idx_best = int(np.argmin(energies))
+        cand_x, cand_y = remaining_points[idx_best]
+        print(f"[solve_surrogate_dwave] Fallback BQM-energy candidate: ({cand_x}, {cand_y})")
+        return cand_x, cand_y
+    except Exception as e:
+        print(f"[solve_surrogate_dwave] BQM-energy fallback failed: {e}")
+        return None, None
+
 
 
 def solve_surrogate_qci(fm_model, x_bound, y_bound, evaluated_points, grid):

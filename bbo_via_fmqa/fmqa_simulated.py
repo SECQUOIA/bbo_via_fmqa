@@ -19,9 +19,10 @@ print(f"Objective range: [{obj_min}, {obj_max}]")
 
 # --- Parameters ---
 max_cycles = 100
-convergence_patience = 5
+convergence_patience = 10
 sampler = SimulatedAnnealingSampler()
 
+print(grid)
 # --- Helper Functions ---
 def evaluate(x, y):
     """Evaluate objective from grid."""
