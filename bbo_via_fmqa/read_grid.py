@@ -1,9 +1,6 @@
 import numpy as np
 import csv
 
-# path = '/Users/woosik/Documents/Purdue/Research/bbo_via_fmqa/dataset/compl_enum_cstr_17_baron_hull.csv'
-# df = pd.read_csv(path)
-
 def load_grid(filename):
     """
     Load grid data from CSV.
@@ -152,26 +149,5 @@ def scale_point(x, y, grid_data, obj_min, obj_max):
       diff = obj_max - obj_min
       scaled = -1 + delta / diff
       return float(scaled)
-
-
-# def decode_and_scale(bitstring: str, x_max: int, y_max: int, grid_data, obj_min, obj_max, lsb_first: bool = False):   # do I need this function??
-#     """
-#     Given a binary bitstring representing x and y, decode to integers,
-#     and calculate the scaled objective value.
-
-#     Parameters:
-#     - bitstring: str (e.g., '101001')
-#     - x_max, y_max: upper bounds for x and y to determine bit lengths
-#     - grid_data: dictionary from load_grid()
-#     - x_min, x_max_obj: objective value bounds for scaling
-
-#     Returns:
-#     - x and y as integers, and scaled objective value in [-1, 1]
-#     """
-
-#     x_int, y_int = bits_to_int(bitstring, lsb_first=lsb_first)
-#     return x_int, y_int, scale_point(x_int, y_int, grid_data, obj_min, obj_max)
-
-
 
 

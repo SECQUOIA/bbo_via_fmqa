@@ -1,0 +1,14 @@
+cycle,px,py,objective,best_val,evaluated_count,no_improvement_count,status
+1,,,,inf,107,1,invalid_or_evaluated
+2,,,,inf,107,2,invalid_or_evaluated
+3,14,6,3.546165611483165,3.546165611483165,107,0,improved
+4,,,,3.546165611483165,107,1,invalid_or_evaluated
+5,,,,3.546165611483165,107,2,invalid_or_evaluated
+6,,,,3.546165611483165,107,3,invalid_or_evaluated
+7,,,,3.546165611483165,107,4,invalid_or_evaluated
+8,,,,3.546165611483165,107,5,invalid_or_evaluated
+9,,,,3.546165611483165,107,6,invalid_or_evaluated
+10,,,,3.546165611483165,107,7,invalid_or_evaluated
+11,,,,3.546165611483165,107,8,invalid_or_evaluated
+12,,,,3.546165611483165,107,9,invalid_or_evaluated
+13,,,,3.546165611483165,107,10,invalid_or_evaluated
