@@ -1,4 +1,6 @@
+from datetime import datetime
 import sys, os
+import csv
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fmqa")))
 
 import numpy as np
@@ -8,18 +10,19 @@ import random
 # Helper and module imports
 import read_grid
 from ml_surrogate import train_surrogate_model, print_final_equation
-from ising_machine import solve_surrogate
+from ising_machine import solve_surrogate_SA
 from dimod import SimulatedAnnealingSampler
 
 # --- Load Full Dataset ---
 # path = path/to/your/dataset.csv
+path = "/Users/woosik/Documents/Purdue/Research/SEQUOIA/FMQA_optimization/bbo_via_fmqa/dataset/alpine2_30x30.csv"
 grid, obj_min, obj_max, x_bound, y_bound = read_grid.load_grid(filename=path)
 print(f"Grid loaded: {len(grid)} points, x in [0,{x_bound}], y in [0,{y_bound}]")
 print(f"Objective range: [{obj_min}, {obj_max}]")
 
 # --- Parameters ---
-max_cycles = 100
-convergence_patience = 10
+max_cycles = 1000000
+convergence_patience = 30
 sampler = SimulatedAnnealingSampler()
 
 print(grid)
@@ -55,8 +58,10 @@ best_coord = None
 history = []
 no_improvement_count = 0
 
+loop_records = []
 # --- FMQA Loop ---
 final_model = None
+
 for t in range(max_cycles):
     print(f"\n=== Cycle {t+1}/{max_cycles} ===")
     print(f"Cycle {t+1}: best so far = {best_val_raw} at {best_coord}")
@@ -66,7 +71,14 @@ for t in range(max_cycles):
     final_model = fm
 
     # Solve surrogate to get candidate
-    px, py = solve_surrogate(fm, x_bound, y_bound, evaluated_points, sampler)
+    px, py = solve_surrogate_SA(
+        fm,
+        x_bound,
+        y_bound,
+        evaluated_points,
+        sampler,
+        grid
+    )
 
     # Debug info
     print((px, py), "in grid?", (px, py) in grid)
@@ -78,20 +90,49 @@ for t in range(max_cycles):
         print("All proposed samples were already evaluated or invalid.")
         no_improvement_count += 1
         history.append(best_val_raw)
+
+        loop_records.append({
+            "cycle": t + 1,
+            "px": None,
+            "py": None,
+            "objective": None,
+            "best_val": best_val_raw,
+            "evaluated_count": len(evaluated_points),
+            "no_improvement_count": no_improvement_count,
+            "status": "invalid_or_duplicate",
+        })
+
         print(f"No improvement for {no_improvement_count} consecutive cycles.")
+
+        if no_improvement_count >= convergence_patience:
+            print(f"\nConvergence reached after {t+1} cycles. Stopping.")
+            break
+
         continue
 
-    # --- TEMPORARY RULE: skip x < y points ---
-    if px < py:
-        print(f"Skipping point ({px}, {py}) because x < y.")
-        evaluated_points.add((px, py))  # mark as evaluated so not proposed again
-        history.append(best_val_raw)
-        print(f"No improvement for {no_improvement_count} consecutive cycles.")
-        continue
+    # # --- TEMPORARY RULE: skip x < y points ---
+    # if px < py:
+    #     print(f"Skipping point ({px}, {py}) because x < y.")
+    #     evaluated_points.add((px, py))  # mark as evaluated so not proposed again
+    #     history.append(best_val_raw)
+    #     print(f"No improvement for {no_improvement_count} consecutive cycles.")
+    #     continue
 
     # --- Evaluate candidate ---
     obj_val_raw = evaluate(px, py)
     evaluated_points.add((px, py))
+    
+    loop_records.append({
+        "cycle": t + 1,
+        "px": px,
+        "py": py,
+        "objective": obj_val_raw,
+        "best_val": best_val_raw,
+        "evaluated_count": len(evaluated_points),
+        "no_improvement_count": no_improvement_count,
+        "status": "evaluated",
+    })
+
     print(f"Proposed ({px},{py}) -> objective {obj_val_raw}")
 
     # --- Print objective every iteration (even if not best) ---
@@ -122,9 +163,7 @@ for t in range(max_cycles):
     print(f"No improvement for {no_improvement_count} consecutive cycles.")
     print(f"Evaluated so far: {len(evaluated_points)} / total {len(grid)}")
 
-    if no_improvement_count >= convergence_patience:
-        print(f"\nConvergence reached after {t+1} cycles. Stopping.")
-        break
+    
 
 if t == max_cycles - 1:
     print(f"\nMax cycles reached without convergence.")
@@ -145,6 +184,33 @@ else:
 if final_model:
     print_final_equation(final_model)
 
+# WRITE CSV LOG (UNIQUE FILE)
+
+os.makedirs("output", exist_ok=True)
+timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+csv_path = os.path.join("output", f"fmqa_SA_log_{timestamp}.csv")
+
+if loop_records:
+    fieldnames = [
+        "cycle",
+        "px",
+        "py",
+        "objective",
+        "best_val",
+        "evaluated_count",
+        "no_improvement_count",
+        "status",
+    ]
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for rec in loop_records:
+            writer.writerow(rec)
+
+    print(f"\nFMQA loop log written to: {csv_path}")
+else:
+    print("\nNo loop records to write (loop did not run?).")
+    
 # --- Visualization ---
 x_vals = np.arange(x_bound + 1)
 y_vals = np.arange(y_bound + 1)
