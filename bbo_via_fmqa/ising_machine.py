@@ -313,38 +313,70 @@ def solve_surrogate_qci(fm_model, x_bound, y_bound, evaluated_points, grid):
     print("QCI returned solutions, but all were previously evaluated or invalid.")
     return None, None
 
-def solve_surrogate(fm_model, x_bound, y_bound, evaluated_points, sampler):
+def solve_surrogate_SA(fm_model, x_bound, y_bound, evaluated_points, sampler, grid):
     """
-    Solves the surrogate model using an simulated quantum annealer (Ising machine sampler) 
-    to find the best new candidate point.
+    Propose next (x, y) point using simulated annealing.
+    Logic is aligned with solve_surrogate_dwave.
 
     Args:
-        fm_model (FMBQM): The trained surrogate model.
-        x_bound (int): The maximum value for the x-coordinate.
-        y_bound (int): The maximum value for the y-coordinate.
-        evaluated_points (set): A set of (x, y) tuples that have already been evaluated.
-        sampler: The dimod sampler to use for solving.
+        fm_model: trained FM BQM
+        x_bound, y_bound: grid bounds
+        evaluated_points: already evaluated (x, y)
+        sampler: dimod sampler
+        grid: dataset grid (for validation)
 
     Returns:
-        tuple or None: An (x, y) tuple for the new candidate, or None if no valid new
-                       candidate was found.
+        (x, y) or (None, None)
     """
-    sampleset = sampler.sample(fm_model, num_reads=100)
+    try:
+        sampleset = sampler.sample(fm_model, num_reads=100)
+    except Exception as e:
+        print(f"[solve_surrogate_SA] Sampler error: {e}")
+        return None, None
+
+    candidates = []
 
     for sample, energy in sampleset.data(['sample', 'energy']):
-        bitlist = [sample[i] for i in sorted(sample.keys())]
+        bitlist = []
+        for i in sorted(sample.keys()):
+            v = sample[i]
+            if v in (-1, 1):
+                bit = 0 if v == -1 else 1
+            else:
+                bit = int(v)
+            bitlist.append(bit)
+
         bitstring = "".join(map(str, bitlist))
 
-        # Decode normally first
-        cand_x, cand_y = read_grid.bits_to_int(bitstring, lsb_first=False)
-        # Swap x and y because coord_bits encoded them in the opposite order
-        cand_x, cand_y = cand_y, cand_x
+        try:
+            cand_x, cand_y = read_grid.bits_to_int(bitstring, lsb_first=False)
+        except Exception:
+            continue
 
-        # Validate candidate
-        if (0 <= cand_x <= x_bound) and (0 <= cand_y <= y_bound):
-            if (cand_x, cand_y) not in evaluated_points:
-                return cand_x, cand_y
+        # Bounds check
+        if not (0 <= cand_x <= x_bound and 0 <= cand_y <= y_bound):
+            continue
 
+        # Grid membership
+        if (cand_x, cand_y) not in grid:
+            continue
+
+        val = grid[(cand_x, cand_y)]
+        if val is None or not np.isfinite(val):
+            continue
+
+        if (cand_x, cand_y) in evaluated_points:
+            continue
+
+        candidates.append((cand_x, cand_y, energy))
+
+    if candidates:
+        cand_x, cand_y, _ = min(candidates, key=lambda t: t[2])
+        print(f"[solve_surrogate_SA] New candidate from SA: ({cand_x}, {cand_y})")
+        return cand_x, cand_y
+
+    print("[solve_surrogate_SA] No valid new candidate found.")
     return None, None
+
 
 

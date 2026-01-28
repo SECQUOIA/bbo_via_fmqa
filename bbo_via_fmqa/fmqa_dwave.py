@@ -271,37 +271,6 @@ if loop_records:
 else:
     print("\nNo loop records to write (loop did not run?).")
 
-
-# ============================================================
-#                 TEST SURROGATE ON TEST SET
-# ============================================================
-
-# if final_model:
-#     # Build feature matrix for test set: one row per test point
-#     test_bitstrings = [
-#         read_grid.coord_bits(x, y, x_bound, y_bound) for (x, y) in test_points
-#     ]
-#     X_test = np.stack([bitstring_to_array(bs) for bs in test_bitstrings], axis=0)
-
-#     # True objective values (raw and scaled)
-#     y_test_raw = np.array([evaluate(x, y) for (x, y) in test_points], dtype=float)
-#     y_test_scaled = np.array([scale_value(v) for v in y_test_raw], dtype=float)
-
-#     # Surrogate predictions (scaled)
-#     y_pred_scaled = final_model.predict(X_test)
-#     y_pred_scaled = np.squeeze(y_pred_scaled)
-
-#     # Basic metrics on scaled values
-#     mse = np.mean((y_pred_scaled - y_test_scaled) ** 2)
-#     mae = np.mean(np.abs(y_pred_scaled - y_test_scaled))
-
-#     print("\n================ SURROGATE TEST RESULTS ================")
-#     print(f"Test set size: {len(test_points)}")
-#     print(f"MSE (scaled objective): {mse:.6e}")
-#     print(f"MAE (scaled objective): {mae:.6e}")
-#     # Optionally convert predictions back to raw objective:
-#     # y_pred_raw = y_pred_scaled * (obj_max - obj_min) + obj_min
-
 # ============================================================
 #                 VISUALIZATION
 # ============================================================
