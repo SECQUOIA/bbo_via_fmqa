@@ -4,7 +4,7 @@ setup(
     name="bbo_via_fmqa",
     version="0.1.0",
     description="A package for Black-Box Optimization via FMQA",
-    author="Woosik Kim, Albert Lee",
+    author="Woosik Kim, Albert Lee, and David E. Bernal Neira",
     author_email="kim3124@purdue.edu",
     packages=find_packages(),
     install_requires=[
