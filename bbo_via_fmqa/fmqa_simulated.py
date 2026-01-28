@@ -16,16 +16,20 @@ from dimod import SimulatedAnnealingSampler
 # --- Load Full Dataset ---
 # path = path/to/your/dataset.csv
 path = "/Users/woosik/Documents/Purdue/Research/SEQUOIA/FMQA_optimization/bbo_via_fmqa/dataset/alpine2_30x30.csv"
+# path = "/Users/woosik/Documents/Purdue/Research/SEQUOIA/FMQA_optimization/bbo_via_fmqa/dataset/shubert_30x30.csv"
+
+graphtype = os.path.splitext(os.path.basename(path))[0]
 grid, obj_min, obj_max, x_bound, y_bound = read_grid.load_grid(filename=path)
 print(f"Grid loaded: {len(grid)} points, x in [0,{x_bound}], y in [0,{y_bound}]")
 print(f"Objective range: [{obj_min}, {obj_max}]")
 
 # --- Parameters ---
 max_cycles = 1000000
-convergence_patience = 30
+convergence_patience = 20
 sampler = SimulatedAnnealingSampler()
 
-print(grid)
+# print(grid)
+
 # --- Helper Functions ---
 def evaluate(x, y):
     """Evaluate objective from grid."""
@@ -188,7 +192,7 @@ if final_model:
 
 os.makedirs("output", exist_ok=True)
 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-csv_path = os.path.join("output", f"fmqa_SA_log_{timestamp}.csv")
+csv_path = os.path.join("output", f"{graphtype}_SA_log_{timestamp}.csv")
 
 if loop_records:
     fieldnames = [
