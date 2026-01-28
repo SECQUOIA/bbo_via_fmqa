@@ -16,7 +16,7 @@ The central idea of FMQA is to combine **surrogate modeling** with **annealing-b
 This repository provides an **end-to-end implementation of FMQA for black-box optimization**, with support for multiple annealing backends.
 
 Head to the link below to install FMQA packages prior to running the project. 
-https://github.com/SECQUOIA/fmqa_pytorch
+https://github.com/SECQUOIA/fmqa_pytorch/blob/main/README.md
 ---
 
 ## Algorithm Description
