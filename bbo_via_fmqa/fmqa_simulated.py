@@ -15,8 +15,7 @@ from dimod import SimulatedAnnealingSampler
 
 # --- Load Full Dataset ---
 # path = path/to/your/dataset.csv
-path = "/Users/woosik/Documents/Purdue/Research/SEQUOIA/FMQA_optimization/bbo_via_fmqa/dataset/alpine2_30x30.csv"
-# path = "/Users/woosik/Documents/Purdue/Research/SEQUOIA/FMQA_optimization/bbo_via_fmqa/dataset/shubert_30x30.csv"
+path = "./bbo_via_fmqa/dataset/alpine2_30x30.csv" # Change this to your dataset path
 
 graphtype = os.path.splitext(os.path.basename(path))[0]
 grid, obj_min, obj_max, x_bound, y_bound = read_grid.load_grid(filename=path)
@@ -113,14 +112,6 @@ for t in range(max_cycles):
             break
 
         continue
-
-    # # --- TEMPORARY RULE: skip x < y points ---
-    # if px < py:
-    #     print(f"Skipping point ({px}, {py}) because x < y.")
-    #     evaluated_points.add((px, py))  # mark as evaluated so not proposed again
-    #     history.append(best_val_raw)
-    #     print(f"No improvement for {no_improvement_count} consecutive cycles.")
-    #     continue
 
     # --- Evaluate candidate ---
     obj_val_raw = evaluate(px, py)
