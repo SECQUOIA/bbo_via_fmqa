@@ -15,8 +15,9 @@ from dimod import SimulatedAnnealingSampler
 
 # --- Load Full Dataset ---
 # path = path/to/your/dataset.csv
-path = "./bbo_via_fmqa/dataset/alpine2_30x30.csv" # Change this to your dataset path
-
+# path = "./bbo_via_fmqa/dataset/alpine2_30x30.csv" # Change this to your dataset path
+# path = "./qhd_2D_graphs/alpine2_30x30.csv"
+path = "./qhd_2D_graphs/easom_30x30.csv"
 graphtype = os.path.splitext(os.path.basename(path))[0]
 grid, obj_min, obj_max, x_bound, y_bound = read_grid.load_grid(filename=path)
 print(f"Grid loaded: {len(grid)} points, x in [0,{x_bound}], y in [0,{y_bound}]")
