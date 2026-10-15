@@ -1,5 +1,6 @@
 from datetime import datetime
 import sys, os
+from pathlib import Path
 import csv
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fmqa")))
 
@@ -14,10 +15,7 @@ from ising_machine import solve_surrogate_SA
 from dimod import SimulatedAnnealingSampler
 
 # --- Load Full Dataset ---
-# path = path/to/your/dataset.csv
-# path = "./bbo_via_fmqa/dataset/alpine2_30x30.csv" # Change this to your dataset path
-# path = "./qhd_2D_graphs/alpine2_30x30.csv"
-path = "./qhd_2D_graphs/easom_30x30.csv"
+path = os.environ.get("FMQA_DATASET", str(Path(__file__).with_name("dataset") / "alpine2_30x30.csv"))
 graphtype = os.path.splitext(os.path.basename(path))[0]
 grid, obj_min, obj_max, x_bound, y_bound = read_grid.load_grid(filename=path)
 print(f"Grid loaded: {len(grid)} points, x in [0,{x_bound}], y in [0,{y_bound}]")
@@ -25,8 +23,10 @@ print(f"Objective range: [{obj_min}, {obj_max}]")
 
 # --- Parameters ---
 # Upper bound on optimization cycles; adjust upward for longer, more exhaustive runs if needed.
-max_cycles = 10000
-convergence_patience = 20
+max_cycles = int(os.environ.get("FMQA_MAX_CYCLES", "10000"))
+convergence_patience = int(os.environ.get("FMQA_CONVERGENCE_PATIENCE", "20"))
+if max_cycles < 1 or convergence_patience < 1:
+    raise ValueError("FMQA_MAX_CYCLES and FMQA_CONVERGENCE_PATIENCE must be positive")
 sampler = SimulatedAnnealingSampler()
 
 # print(grid)
@@ -40,13 +40,15 @@ def scale_value(y_val):
     """Normalize objective values to [0,1] range."""
     if y_val == np.inf:
         return np.inf
-    return (y_val - obj_min) / (obj_max - obj_min)
+    return 0.0 if obj_max == obj_min else (y_val - obj_min) / (obj_max - obj_min)
 
 # --- Create Training and Testing Split (70/30) ---
-all_feasible_points = [p for p, v in grid.items() if not np.isnan(v)]
+all_feasible_points = [p for p, v in grid.items() if np.isfinite(v)]
 random.shuffle(all_feasible_points)
 
-split_index = int(0.7 * len(all_feasible_points))
+if len(all_feasible_points) < 2:
+    raise ValueError("FMQA requires at least two finite grid points")
+split_index = min(len(all_feasible_points) - 1, max(1, int(0.7 * len(all_feasible_points))))
 train_points = all_feasible_points[:split_index]
 test_points = all_feasible_points[split_index:]
 
@@ -58,8 +60,8 @@ xs = [read_grid.coord_bits(dx, dy, x_bound, y_bound) for dx, dy in train_points]
 ys = [scale_value(evaluate(dx, dy)) for dx, dy in train_points]
 
 # --- Tracking and Convergence ---
-best_val_raw = np.inf
-best_coord = None
+best_coord = min(train_points, key=grid.get)
+best_val_raw = grid[best_coord]
 history = []
 no_improvement_count = 0
 
@@ -119,17 +121,6 @@ for t in range(max_cycles):
     obj_val_raw = evaluate(px, py)
     evaluated_points.add((px, py))
     
-    loop_records.append({
-        "cycle": t + 1,
-        "px": px,
-        "py": py,
-        "objective": obj_val_raw,
-        "best_val": best_val_raw,
-        "evaluated_count": len(evaluated_points),
-        "no_improvement_count": no_improvement_count,
-        "status": "evaluated",
-    })
-
     print(f"Proposed ({px},{py}) -> objective {obj_val_raw}")
 
     # --- Print objective every iteration (even if not best) ---
@@ -148,6 +139,17 @@ for t in range(max_cycles):
         print("No improvement this iteration.")
         no_improvement_count += 1
 
+    loop_records.append({
+        "cycle": t + 1,
+        "px": px,
+        "py": py,
+        "objective": obj_val_raw,
+        "best_val": best_val_raw,
+        "evaluated_count": len(evaluated_points),
+        "no_improvement_count": no_improvement_count,
+        "status": "evaluated",
+    })
+
     # --- Scale and append data for next iteration ---
     obj_val_scaled = scale_value(obj_val_raw)
     if obj_val_scaled == np.inf:
@@ -160,7 +162,9 @@ for t in range(max_cycles):
     print(f"No improvement for {no_improvement_count} consecutive cycles.")
     print(f"Evaluated so far: {len(evaluated_points)} / total {len(grid)}")
 
-    
+    if no_improvement_count >= convergence_patience:
+        print(f"\nConvergence reached after {t+1} cycles. Stopping.")
+        break
 
 if t == max_cycles - 1:
     print(f"\nMax cycles reached without convergence.")

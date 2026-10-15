@@ -1,6 +1,5 @@
 import read_grid
 import numpy as np
-from qci_client import QciClient
 from math import isfinite
 
 # QCI_TOKEN = 'your_api_token'
@@ -199,6 +198,8 @@ def solve_surrogate_qci(fm_model, x_bound, y_bound, evaluated_points, grid):
     # ---------- 2. Submit polynomial to Dirac-3 ----------
     print("Submitting Hamiltonian job to QCI (for Dirac-3)...")
     try:
+        from qci_client import QciClient
+
         client = QciClient(api_token=QCI_TOKEN, url=QCI_API_URL)
 
         polynomial_file = {
@@ -349,7 +350,11 @@ def solve_surrogate_SA(fm_model, x_bound, y_bound, evaluated_points, sampler, gr
         bitstring = "".join(map(str, bitlist))
 
         try:
-            cand_x, cand_y = read_grid.bits_to_int(bitstring, lsb_first=False)
+            x_width, y_width = int(x_bound).bit_length(), int(y_bound).bit_length()
+            if len(bitstring) != x_width + y_width:
+                continue
+            cand_x = int(bitstring[:x_width], 2) if x_width else 0
+            cand_y = int(bitstring[x_width:], 2) if y_width else 0
         except Exception:
             continue
 
