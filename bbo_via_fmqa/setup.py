@@ -8,7 +8,8 @@ setup(
     author_email="kim3124@purdue.edu",
     packages=["bbo_via_fmqa"],
     package_dir={"bbo_via_fmqa": "."},
-    py_modules=["read_grid", "ml_surrogate", "ising_machine"],
+    package_data={"bbo_via_fmqa": ["dataset/*.csv"]},
+    py_modules=["read_grid", "ml_surrogate", "ising_machine", "qhd_grid_generator"],
     install_requires=[
         "numpy>=1.21.0",
         "dimod>=0.12.0",
