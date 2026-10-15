@@ -1,173 +1,153 @@
 # Black-Box Optimization via FMQA
 
-This repository provides a PyTorch-based implementation for Black-Box Optimization using Factorization Machines with Quantum Annealing (FMQA). The implementation builds upon the original work from [tsudalab/fmqa](https://github.com/tsudalab/fmqa).
+This repository implements Factorization Machines with Quantum Annealing (FMQA)
+using PyTorch. It adapts the original MIT-licensed
+[Tsuda Laboratory implementation](https://github.com/tsudalab/fmqa), which used
+MXNet. The repository includes the PyTorch port so installation does not depend
+on an unrelated or unavailable package from a package index.
 
-## Overview
+## Algorithm
 
-This package enables data-driven optimization of black-box functions using a trainable Binary Quadratic Model (BQM) based on Factorization Machines. In combination with annealing solvers (simulated or quantum), it can optimize complex objective functions without requiring explicit analytical forms.
+FMQA optimizes a black-box objective over a discrete grid:
 
-The core approach:
-1. Sample initial points from the search space
-2. Train a Factorization Machine as a surrogate model
-3. Use an annealing solver to optimize the surrogate
-4. Evaluate promising candidates on the true objective
-5. Iteratively refine the model with new data
+1. Evaluate an initial set of points and encode their coordinates as binary vectors.
+2. Fit a factorization machine to the observed objective values.
+3. Convert the surrogate into a binary quadratic model (QUBO/Ising Hamiltonian).
+4. Use an annealing sampler to propose a candidate.
+5. Evaluate the candidate with the true objective and retrain with the new data.
 
-## Features
+The factorization machine models
 
-- **PyTorch-based Factorization Machine**: Efficient training with automatic differentiation
-- **Integration with D-Wave Ocean**: Compatible with `dimod` for various annealing solvers
-- **Flexible encoding**: Support for binary and integer variable representations
-- **Black-box optimization**: No analytical form required for objective functions
+$$\hat f(x)=w_0+\sum_i w_i x_i+\sum_{i<j}\langle v_i,v_j\rangle x_i x_j.$$
+
+The available solver adapters support simulated annealing, D-Wave hybrid
+sampling, and QCI Dirac. The cloud backends require their respective SDKs,
+credentials, and service access; the ordinary tests run locally without them.
 
 ## Installation
 
-### Prerequisites
-- Python >= 3.7
-- pip
+Python 3.10 or later is required. From a fresh clone, create an isolated
+environment and install both local distributions together:
 
-### Install from source
-
-1. Clone this repository:
 ```bash
 git clone https://github.com/SECQUOIA/bbo_via_fmqa.git
 cd bbo_via_fmqa
+uv venv --python 3.11
+source .venv/bin/activate
+uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+uv pip install ./fmqa ./bbo_via_fmqa -r requirements-test.txt
 ```
 
-2. Install the fmqa package:
-```bash
-cd fmqa
-pip install -e .
-cd ..
-```
+The CPU PyTorch build is sufficient for the examples and tests. A compatible
+PyTorch installation with GPU support can also be used. With pip, replace
+`uv pip install` with `python -m pip install` after creating a virtual environment.
+The local `fmqa` package provides the PyTorch model and requires NumPy and dimod;
+`bbo_via_fmqa` also uses pandas and Matplotlib. Optional SDKs can be installed with
+`uv pip install './bbo_via_fmqa[qci]'` or
+`uv pip install './bbo_via_fmqa[dwave]'` after installing the bundled model.
 
-3. Install the bbo_via_fmqa package:
-```bash
-cd bbo_via_fmqa
-pip install -e .
-cd ..
-```
+## Basic example
 
-### Dependencies
-
-The main dependencies include:
-- `numpy >= 1.21.0`
-- `torch` (PyTorch)
-- `dimod >= 0.1.4` (D-Wave Ocean SDK)
-- `pandas >= 1.3.0`
-- `matplotlib >= 3.4.0`
-
-## Usage
-
-### Basic Example
-
-See `bbo_via_fmqa/fmqa_test.py` for a complete working example. The basic workflow:
+This small example trains a surrogate and samples its binary quadratic model:
 
 ```python
-import numpy as np
 import dimod
+import numpy as np
 from fmqa import FMBQM
 
-# Prepare your dataset (binary vectors and objective values)
-x_data = np.array([[0, 1, 0, 1], [1, 0, 1, 0], ...])  # Binary vectors
-y_data = np.array([0.5, -0.3, ...])                    # Objective values
-
-# Train a surrogate model
-fm_model = FMBQM.from_data(
-    x=x_data, 
-    y=y_data, 
-    num_epoch=1000, 
-    learning_rate=1e-2
-)
-
-# Use an annealing solver to optimize the surrogate
-sampler = dimod.SimulatedAnnealingSampler()
-results = sampler.sample(fm_model, num_reads=100)
-
-# Extract the best candidate solution
-for sample, energy in results.data(['sample', 'energy']):
-    print(f"Candidate: {sample}, Energy: {energy}")
-    break
+x_data = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+y_data = np.array([0.0, 1.0, 2.0, 3.0])
+model = FMBQM.from_data(x_data, y_data, num_epoch=300, learning_rate=1e-2)
+print("Predictions:", model.predict(x_data))
+results = dimod.SimulatedAnnealingSampler().sample(model, num_reads=20)
+print("Candidate:", results.first.sample)
 ```
 
-### Grid-based Optimization
+`bbo_via_fmqa.read_grid` loads CSV files with `x`, `y`, and `Objective`
+columns, encodes integer coordinates, and evaluates grid points. Missing points
+and NaN objective values receive an infinite penalty. For example:
 
-The repository includes utilities for optimizing over discrete grids:
+```python
+from bbo_via_fmqa import read_grid
 
-1. Load grid data from CSV (with columns: `x`, `y`, `Objective`)
-2. Encode coordinates as binary strings
-3. Run iterative optimization with FMQA
-
-See `bbo_via_fmqa/fmqa_test.py` for implementation details.
-
-## Project Structure
-
+grid, obj_min, obj_max, x_max, y_max = read_grid.load_grid("my_grid.csv")
+value = read_grid.obj_funct([1, 2], grid)
+bits = read_grid.coord_bits(1, 2, x_max, y_max)
 ```
+
+The `fmqa_simulated.py`, `fmqa_dwave.py`, and `fmqa_qci.py` experiment scripts
+show the iterative optimization loop. Inspect their dataset paths and backend
+configuration before running them; they are experiment drivers rather than the
+minimal installation smoke test above.
+
+## Repository structure
+
+```text
+.github/workflows/ci.yml              # CPU test matrix and coverage artifacts
+requirements-test.txt                 # Test tools
+fmqa/
+    setup.py                          # Bundled PyTorch distribution (fmqa 0.0.1)
+    LICENSE                           # Original MIT notice
+    fmqa/factorization_machine.py     # PyTorch surrogate
+    fmqa/fm_binary_quadratic_model.py  # Trainable dimod model
 bbo_via_fmqa/
-├── README.md                  # This file
-├── LICENSE                    # MIT License
-├── bbo_via_fmqa/              # Main package
-│   ├── setup.py              # Package setup
-│   ├── fmqa_test.py          # Example optimization script
-│   ├── read_grid.py          # Grid data utilities
-│   └── tests/                # Test suite
-└── fmqa/                     # Original fmqa implementation
-    ├── LICENSE               # Original MIT License
-    ├── README.md             # Original documentation
-    └── fmqa/                 # Core FMQA package
-        ├── factorization_machine.py
-        └── fm_binary_quadratic_model.py
+    setup.py                          # Grid tools and solver adapters
+    read_grid.py                      # CSV loading and binary encoding
+    ml_surrogate.py                   # Training wrapper
+    ising_machine.py                  # Annealing adapters
+    fmqa_simulated.py                 # Simulated experiment driver
+    fmqa_dwave.py                     # D-Wave experiment driver
+    fmqa_qci.py                       # QCI experiment driver
+    dataset/                          # Example input grids
+    tests/                            # Unit and integration tests
 ```
 
-## Testing
+The bundled model source originates from the PyTorch port already present in
+this repository's history at commit
+`8e5f331c3798a7f8554b07082393734267ea9dbc`; prediction uses PyTorch tensors in
+place of the remaining MXNet calls. Generated bytecode and packaging metadata
+are excluded from the restored source.
 
-Run the test suite:
+## Tests and CI
+
+After installation, run:
 
 ```bash
-pytest bbo_via_fmqa/tests/
+python -m pytest --import-mode=importlib bbo_via_fmqa/tests -v \
+  --cov=bbo_via_fmqa --cov=fmqa --cov-report=term
 ```
 
-Or run tests with coverage:
+Tests cover coordinate encoding/decoding, CSV loading, infeasible-point handling,
+production scaling, model training and prediction, and local annealing. A broken
+mandatory model import fails collection. Cloud hardware is not exercised.
 
-```bash
-pytest --cov=bbo_via_fmqa bbo_via_fmqa/tests/
-```
+GitHub Actions runs the tests on Python 3.10–3.13 for pushes to `main` and pull
+requests targeting `main`. It installs the distributions without editable source
+path overrides and runs tests outside the checkout to exercise the installed
+packages. Each matrix job retains its XML coverage report as a workflow artifact;
+no external coverage-service account is required.
 
-## Acknowledgments
+## Attribution and citation
 
-This implementation is based on the original [fmqa package](https://github.com/tsudalab/fmqa) developed by Tsuda Laboratory. The original implementation used MXNet, while this version uses PyTorch for the Factorization Machine implementation.
-
-### Citation
-
-If you use this package in your research, please cite the original paper:
+The original FMQA code and method were developed by Tsuda Laboratory. This
+repository ports the model to PyTorch and adds grid optimization and solver
+integration. Please cite the original paper when using the method:
 
 ```bibtex
 @article{PhysRevResearch.2.013319,
   title = {Designing metamaterials with quantum annealing and factorization machines},
   author = {Kitai, Koki and Guo, Jiang and Ju, Shenghong and Tanaka, Shu and Tsuda, Koji and Shiomi, Junichiro and Tamura, Ryo},
-  journal = {Phys. Rev. Research},
+  journal = {Physical Review Research},
   volume = {2},
-  issue = {1},
   pages = {013319},
-  numpages = {10},
   year = {2020},
-  month = {Mar},
-  publisher = {American Physical Society},
-  doi = {10.1103/PhysRevResearch.2.013319},
-  url = {https://link.aps.org/doi/10.1103/PhysRevResearch.2.013319}
+  doi = {10.1103/PhysRevResearch.2.013319}
 }
 ```
 
-## License
+## License and contributions
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-The original fmqa package is also licensed under the MIT License. See [fmqa/LICENSE](fmqa/LICENSE) for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Support
-
-For issues and questions, please open an issue on the [GitHub repository](https://github.com/SECQUOIA/bbo_via_fmqa/issues).
+The project is distributed under the [MIT License](LICENSE), with the original
+Tsuda Laboratory notice retained in [fmqa/LICENSE](fmqa/LICENSE).
+Report bugs and propose focused changes through this repository's issues and
+pull requests. Include a reproducing example and relevant tests for behavior fixes.

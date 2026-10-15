@@ -58,7 +58,7 @@ class QuadraticLayer(nn.Module):
             loss.backward()
             optimizer.step()
 
-   
+
     def train(self, x=None, y=None, num_epoch=100, learning_rate=1e-2):
         """Training of the regression model using Adam optimizer.
         """
@@ -82,7 +82,7 @@ class FactorizationMachine(QuadraticLayer):
             "sigmoid": torch.sigmoid,
             "tanh": torch.tanh
         }[act]
-        
+
         # Parameters
         self.h = nn.Parameter(torch.randn(input_size))       # linear weights
         self.bias = nn.Parameter(torch.zeros(1))             # bias
@@ -99,7 +99,7 @@ class FactorizationMachine(QuadraticLayer):
         nn.init.normal_(self.h, mean=mean, std=std)
         nn.init.normal_(self.V, mean=mean, std=std)
         nn.init.zeros_(self.bias)
-        
+
     def forward(self, x):
         """Forward pass
 

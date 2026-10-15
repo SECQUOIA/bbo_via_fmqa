@@ -18,11 +18,17 @@ For the functions specific to `FMBQM`, such as how to train the model,
 please refer to the example code below.
 
 ## Install
-On the root of the project, run
+
+This directory contains the repository's PyTorch port of the original
+[Tsuda Laboratory FMQA model](https://github.com/tsudalab/fmqa).
+Use Python 3.10 or later. From the repository root, follow the environment setup
+in [the main README](../README.md), then install the bundled model with:
 
 ```bash
-$ python setup.py install
+uv pip install ./fmqa
 ```
+
+The prediction method uses PyTorch tensors; no MXNet installation is required.
 
 ## Example
 For an example use of the package, we try to minimize this function:
@@ -120,4 +126,3 @@ If you use this package in your work, please cite:
 }
 
 ```
-

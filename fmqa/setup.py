@@ -8,9 +8,10 @@ setuptools.setup(
     description="Trainable Binary Quadratic Model based on Factorization Machine",
     license="MIT",
     packages=["fmqa"],
+    python_requires=">=3.10",
     install_requires=[
-        "dimod",
+        "dimod>=0.12.0",
         "torch>=2.0.0",
-        "numpy>=1.15.0",
+        "numpy>=1.21.0",
     ]
 )

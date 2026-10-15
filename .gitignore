@@ -132,3 +132,10 @@ Thumbs.db
 # Temporary files
 tmp/
 *.tmp
+
+# Additional local artifacts
+pip-log.txt
+pip-delete-this-directory.txt
+*.local
+*.config
+*.save

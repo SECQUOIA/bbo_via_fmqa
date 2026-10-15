@@ -3,7 +3,7 @@ Trainable Binary Quadratic Model based on Factorization Machine (FMBQM)
 """
 
 import numpy as np
-# from mxnet import nd
+import torch
 from dimod.binary_quadratic_model import BinaryQuadraticModel
 from dimod.vartypes import Vartype, as_vartype
 from dimod import BQM
@@ -115,13 +115,15 @@ class FactorizationMachineBinaryQuadraticModel(BinaryQuadraticModel):
                 Input vectors of SPIN/BINARY.
 
         Returns:
-            :obj:`numppy.ndarray`: Predicted values.
+            :obj:`numpy.ndarray`: Predicted values.
         """
         self._check_vartype(x)
-        x = nd.array(x)
-        if len(x.shape) == 1:
-            x = nd.expand_dims(x, axis=0)
-        return self.fm(x).asnumpy()
+        parameter = next(self.fm.parameters())
+        x = torch.as_tensor(x, dtype=parameter.dtype, device=parameter.device)
+        if x.ndim == 1:
+            x = x.unsqueeze(0)
+        with torch.no_grad():
+            return self.fm(x).cpu().numpy()
 
     def _check_vartype(self, x):
         if (self.vartype is Vartype.BINARY) and np.all((1 == x) | (0 == x)) or \
@@ -174,4 +176,3 @@ class FactorizationMachineBinaryQuadraticModel(BinaryQuadraticModel):
         return Q_dict, b
 
 FMBQM = FactorizationMachineBinaryQuadraticModel
-
