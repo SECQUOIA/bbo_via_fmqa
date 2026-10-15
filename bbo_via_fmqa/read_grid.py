@@ -120,8 +120,9 @@ def bits_to_int(bits: str, x_max: int = None, y_max: int = None, lsb_first: bool
     - bits_to_int('101001', lsb_first=False) -> (5, 1)
     """
     
-    if lsb_first:
-        bits = bits[::-1]  # Reverse the bits if LSB first
+    # Keep the historical whole-string convention only for unbounded decoding.
+    if lsb_first and x_max is None and y_max is None:
+        bits = bits[::-1]
 
     if (x_max is None) != (y_max is None):
         raise ValueError("x_max and y_max must both be provided or both be omitted")
@@ -138,6 +139,8 @@ def bits_to_int(bits: str, x_max: int = None, y_max: int = None, lsb_first: bool
             bits = bits.rjust(total_len, "0")
         x_bits = bits[:x_len]
         y_bits = bits[x_len:x_len + y_len]
+        if lsb_first:
+            x_bits, y_bits = x_bits[::-1], y_bits[::-1]
 
     return _bits_fragment_to_int(x_bits), _bits_fragment_to_int(y_bits)
 
@@ -146,9 +149,6 @@ def bits_to_int_3d(bits: str, x_max: int, y_max: int, z_max: int, lsb_first: boo
     """
     Decode a binary string into (x, y, z) using bounds to determine bit lengths.
     """
-    if lsb_first:
-        bits = bits[::-1]
-
     x_len = _bit_length_for_upper(x_max)
     y_len = _bit_length_for_upper(y_max)
     z_len = _bit_length_for_upper(z_max)
@@ -159,6 +159,9 @@ def bits_to_int_3d(bits: str, x_max: int, y_max: int, z_max: int, lsb_first: boo
     x_bits = bits[:x_len]
     y_bits = bits[x_len:x_len + y_len]
     z_bits = bits[x_len + y_len:x_len + y_len + z_len]
+
+    if lsb_first:
+        x_bits, y_bits, z_bits = x_bits[::-1], y_bits[::-1], z_bits[::-1]
 
     return (
         _bits_fragment_to_int(x_bits),

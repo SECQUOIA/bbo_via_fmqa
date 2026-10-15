@@ -87,7 +87,7 @@ def solve_surrogate_dwave(
         sampleset = None
 
     if sampleset is not None and len(sampleset):
-        variables = list(sampleset.variables)
+        variables = sorted(sampleset.variables)
         for sample, energy in sampleset.data(['sample', 'energy']):
             # sample: {var_label: value, ...}
             bitlist = []
@@ -208,8 +208,16 @@ def _extract_qci_metrics_device_runtime_seconds(metrics_response):
         return None
 
     durations = []
+    seen_nodes = set()
+    concrete_dirac = any(name.startswith("dirac-3_") for name in device_metrics)
 
     for device_name, device_node in device_metrics.items():
+        # The SDK exposes dirac-3 as an alias of the concrete device metric.
+        if device_name == "dirac-3" and concrete_dirac:
+            continue
+        if id(device_node) in seen_nodes:
+            continue
+        seen_nodes.add(id(device_node))
         if not isinstance(device_node, dict):
             continue
 
@@ -317,7 +325,6 @@ def solve_surrogate_qci(fm_model, x_bound, y_bound, evaluated_points, grid):
         runtime still reflects any device time spent by the attempted job.
     """
     from math import isfinite
-    from qci_client import QciClient
 
     def fallback_candidate(qci_runtime_sec=0.0):
         candidate = _select_lowest_energy_candidate(
@@ -369,6 +376,8 @@ def solve_surrogate_qci(fm_model, x_bound, y_bound, evaluated_points, grid):
         )
         return fallback_candidate()
     try:
+        from qci_client import QciClient
+
         client = QciClient(api_token=qci_token, url=qci_api_url)
 
         polynomial_file = {
@@ -501,7 +510,7 @@ def solve_surrogate_qci(fm_model, x_bound, y_bound, evaluated_points, grid):
 
 def _sample_bits_and_energy(sampleset):
     """Yield decoded bit strings and energies from sampler results."""
-    variables = list(sampleset.variables)
+    variables = sorted(sampleset.variables)
     for sample, energy in sampleset.data(['sample', 'energy']):
         bitlist = []
         for variable in variables:
@@ -522,7 +531,7 @@ def _select_lowest_energy_candidate(fm_model, encoded_candidates, log_prefix):
         return None
 
     try:
-        variables = list(fm_model.variables)
+        variables = sorted(fm_model.variables)
         best_candidate = None
         best_energy = None
 

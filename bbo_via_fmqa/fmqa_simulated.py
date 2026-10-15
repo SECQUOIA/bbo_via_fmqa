@@ -259,7 +259,7 @@ def main():
         )
 
         convergence_patience = min(
-            max(1, int(dataset_max_cycles * 0.1)),
+            dataset_max_cycles,
             max(1, int(len(all_feasible_points) * convergence_patience_fraction)),
         )
 

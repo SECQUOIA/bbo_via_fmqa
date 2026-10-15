@@ -137,6 +137,19 @@ controls the non-improvement patience. Initial observations contribute to the
 reported incumbent. The QCI driver additionally records surrogate training and
 QCI device timing; service access requires the QCI extra and credentials.
 
+For simulated runs the effective cycle budget is the smallest of the requested
+limit, 1000, and 10% of finite grid points (at least one cycle). Patience is the
+requested fraction of finite points, clamped to `[1, effective cycle budget]`.
+The QCI driver uses `min(requested cycles, max(40, 6 * encoded bit count))` and
+applies its convergence fraction to that cycle budget.
+
+Each QCI invocation starts a fresh campaign. To continue an interrupted campaign,
+set `FMQA_RESUME_SUMMARY` to its summary CSV and keep `FMQA_OUTPUT_DIR` pointed
+at that CSV's directory. The adjacent `.manifest.json` must match dataset bytes,
+cycle limit, convergence fraction, and start-selection seed. Changed inputs are
+rejected; legacy summaries without a manifest cannot be resumed automatically.
+`FMQA_RUNS_PER_GRAPH` can be increased to add starts with the same configuration.
+
 For editable development installs, activate your environment and run
 `bash scripts/setup_local_editable.sh` from any directory.
 

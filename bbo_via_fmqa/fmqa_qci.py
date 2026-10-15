@@ -3,7 +3,9 @@ import sys, os
 import time
 import csv
 import random
-import glob
+import hashlib
+import json
+from pathlib import Path
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(SCRIPT_DIR, "..", "fmqa")))
@@ -345,19 +347,6 @@ def csv_has_expected_header(csv_path, expected_fieldnames):
     return header == list(expected_fieldnames)
 
 
-def find_latest_summary_csv(expected_fieldnames=None):
-    """Return the most recent all-runs summary CSV, optionally matching a schema."""
-    pattern = os.path.join(OUTPUT_DIR, "fmqa_qci_all_runs_*.csv")
-    summary_paths = sorted(glob.glob(pattern))
-    if expected_fieldnames is None:
-        return summary_paths[-1] if summary_paths else None
-
-    for summary_path in reversed(summary_paths):
-        if csv_has_expected_header(summary_path, expected_fieldnames):
-            return summary_path
-    return None
-
-
 def extract_timestamp_from_summary_path(summary_path):
     """Recover the run timestamp from a summary CSV filename."""
     basename = os.path.basename(summary_path)
@@ -414,6 +403,45 @@ def prune_result_rows_for_run(results_path, graphtype, run_index):
         writer.writerows(filtered_rows)
 
 
+def campaign_identity(dataset_paths, requested_max_cycles, convergence_fraction):
+    """Bind resumable work to dataset bytes and algorithm settings, not basenames alone."""
+    return {
+        "schema_version": 1,
+        "datasets": {
+            os.path.basename(path): hashlib.sha256(Path(path).read_bytes()).hexdigest()
+            for path in dataset_paths
+        },
+        "max_cycles": requested_max_cycles,
+        "convergence_fraction": convergence_fraction,
+        "start_selection_seed": 0,
+    }
+
+
+def open_campaign(dataset_paths, requested_max_cycles, convergence_fraction):
+    """Create a new campaign, or explicitly resume a matching existing campaign."""
+    identity = campaign_identity(dataset_paths, requested_max_cycles, convergence_fraction)
+    resume_path = os.environ.get("FMQA_RESUME_SUMMARY", "").strip()
+    if resume_path:
+        summary_path = os.path.abspath(resume_path)
+        if not csv_has_expected_header(summary_path, SUMMARY_FIELDNAMES):
+            raise ValueError("Resume summary is missing or has an incompatible schema")
+        manifest_path = Path(summary_path + ".manifest.json")
+        if not manifest_path.is_file():
+            raise ValueError("Resume summary has no dataset/configuration manifest")
+        if json.loads(manifest_path.read_text()) != identity:
+            raise ValueError("Resume dataset or configuration does not match the recorded campaign")
+        # Result rows and summary must live together for partial-run recovery.
+        if os.path.dirname(summary_path) != os.path.abspath(OUTPUT_DIR):
+            raise ValueError("FMQA_OUTPUT_DIR must match the resume summary directory")
+        timestamp = extract_timestamp_from_summary_path(summary_path)
+        return summary_path, timestamp, load_completed_runs(summary_path)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
+    summary_path = create_summary_csv(timestamp)
+    Path(summary_path + ".manifest.json").write_text(json.dumps(identity, indent=2) + "\n")
+    return summary_path, timestamp, set()
+
+
 def main():
     runs_per_graph = int(os.environ.get("FMQA_RUNS_PER_GRAPH", str(DEFAULT_RUNS_PER_GRAPH)))
     if runs_per_graph <= 0:
@@ -446,26 +474,11 @@ def main():
 
     print(f"Resolved {len(dataset_paths)} dataset(s) from {_display_path(DATASET_DIR)}")
 
-    latest_summary_path = find_latest_summary_csv()
-    existing_summary_path = find_latest_summary_csv(
-        expected_fieldnames=SUMMARY_FIELDNAMES
+    summary_path, run_timestamp, completed_run_keys = open_campaign(
+        dataset_paths, requested_max_cycles, convergence_patience_fraction
     )
-    if existing_summary_path is not None:
-        summary_path = existing_summary_path
-        run_timestamp = extract_timestamp_from_summary_path(summary_path)
-        completed_run_keys = load_completed_runs(summary_path)
-        print(f"Resuming from existing summary CSV: {_display_path(summary_path)}")
-        print(f"Found {len(completed_run_keys)} completed run(s) to skip.")
-    else:
-        if latest_summary_path is not None:
-            print(
-                "Latest summary CSV uses an older runtime schema and will not be "
-                f"resumed: {_display_path(latest_summary_path)}"
-            )
-        run_timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        summary_path = create_summary_csv(run_timestamp)
-        completed_run_keys = set()
-        print(f"Original summary CSV will be updated at: {_display_path(summary_path)}")
+    print(f"Campaign summary CSV: {_display_path(summary_path)}")
+    print(f"Found {len(completed_run_keys)} completed run(s) to skip.")
 
     completed_runs = len(completed_run_keys)
 
