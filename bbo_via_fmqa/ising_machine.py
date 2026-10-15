@@ -1,6 +1,5 @@
 import read_grid
 import numpy as np
-from qci_client import QciClient
 from math import isfinite
 
 # QCI_TOKEN = 'your_api_token'
@@ -199,6 +198,8 @@ def solve_surrogate_qci(fm_model, x_bound, y_bound, evaluated_points, grid):
     # ---------- 2. Submit polynomial to Dirac-3 ----------
     print("Submitting Hamiltonian job to QCI (for Dirac-3)...")
     try:
+        from qci_client import QciClient
+
         client = QciClient(api_token=QCI_TOKEN, url=QCI_API_URL)
 
         polynomial_file = {
