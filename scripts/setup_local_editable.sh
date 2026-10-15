@@ -1,15 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run from repository root:
-#   bash scripts/setup_local_editable.sh
-
-for project in fmqa ECP bbo_via_fmqa; do
-    if [[ -d "./${project}" ]]; then
-        python -m pip install --no-build-isolation -e "./${project}"
-    else
-        echo "Skipping ${project}: directory not present."
-    fi
-done
-
-echo "Install complete."
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+if command -v uv >/dev/null 2>&1; then
+    uv pip install -e "$repo_root/fmqa" -e "$repo_root/bbo_via_fmqa"
+else
+    python -m pip install -e "$repo_root/fmqa" -e "$repo_root/bbo_via_fmqa"
+fi

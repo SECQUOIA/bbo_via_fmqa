@@ -17,10 +17,10 @@ from dimod import SimulatedAnnealingSampler
 
 
 DATASET_DIR = os.path.abspath(
-    os.environ.get("FMQA_DATASET_DIR", os.path.join(SCRIPT_DIR, "qhd_2D_graphs"))
+    os.environ.get("FMQA_DATASET_DIR", os.path.join(os.getcwd(), "qhd_2D_graphs"))
 )
 OUTPUT_DIR = os.path.abspath(
-    os.environ.get("FMQA_OUTPUT_DIR", os.path.join(SCRIPT_DIR, "output"))
+    os.environ.get("FMQA_OUTPUT_DIR", os.path.join(os.getcwd(), "output"))
 )
 DEFAULT_RUNS_PER_GRAPH = 10
 DEFAULT_MAX_CYCLES = 150

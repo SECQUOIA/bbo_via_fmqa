@@ -1,10 +1,11 @@
-"""
-Generate 2D grid datasets for several standard optimization test functions.
+"""Vectorized benchmark functions and normalized integer-grid CSV generation.
 
-The benchmark functions defined in this module are adapted from the
-Quantum Hamiltonian Descent reference page:
+Original benchmark catalog reference:
 https://jiaqileng.github.io/quantum-hamiltonian-descent/nonconvex2d.html
-
+Shubert and Xin-She Yang 3 follow equations 19 and 22 of X.-S. Yang,
+Test Problems in Optimization (2010), https://arxiv.org/abs/1008.0549.
+Yang 3 uses beta=15 and m=5. Other domains are defined in GRAPH_SPECS;
+Styblinski-Tang retains the explicit 1/78 scaling convention.
 """
 
 import numpy as np
@@ -13,7 +14,7 @@ from typing import Callable, Dict, Tuple
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-DEFAULT_OUTPUT_DIR = os.path.join(SCRIPT_DIR, "qhd_2D_graphs")
+DEFAULT_OUTPUT_DIR = os.path.join(os.getcwd(), "qhd_2D_graphs")
 
 
 def _display_path(path: str) -> str:
@@ -61,10 +62,12 @@ def camel3(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return 2 * x**2 - 1.05 * x**4 + (x**6) / 6 + x * y + y**2
 
 def csendes(x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    # NOTE: This function has 1/x and 1/y; if x or y is 0 you get inf/nan.
-    # We'll handle safety in evaluation by replacing zeros with eps.
-    term1 = x**6 * (2 + np.sin(1 / x))**2
-    term2 = y**6 * (2 + np.sin(1 / y))**2
+    # Use the continuous extension at zero, including for direct array calls.
+    x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    inv_x = np.divide(1.0, x, out=np.zeros_like(x), where=x != 0)
+    inv_y = np.divide(1.0, y, out=np.zeros_like(y), where=y != 0)
+    term1 = x**6 * (2 + np.sin(inv_x))**2
+    term2 = y**6 * (2 + np.sin(inv_y))**2
     return term1 + term2
 
 def rosenbrock(x: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -78,9 +81,9 @@ def easom(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return -np.cos(x) * np.cos(y) * np.exp(-((x - np.pi)**2 + (y - np.pi)**2))
 
 def xin_she_yang3(x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    term1 = np.exp(-((x / 15)**6 + (y / 1)**6))
-    term2 = -2 * np.exp(-x**2 - y**2) * np.cos(x)**2 * np.cos(y) ** 2
-    return term1 - term2
+    envelope = np.exp(-((x / 15)**10 + (y / 15)**10))
+    defect = 2 * np.exp(-x**2 - y**2)
+    return (envelope - defect) * np.cos(x)**2 * np.cos(y)**2
 
 # Studded
 def alpine1(x: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -107,7 +110,9 @@ def hosaki(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return (1 - 8*x + 7*x**2 - (7/3)*x**3 + (1/4)*x**4) * y**2 * np.exp(-y)
 
 def shubert(x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    return (np.cos(2*x + 1) + 2 * np.cos(3*x + 2) + 3 * np.cos(4*x + 3)) * (np.cos(2*y + 1) + np.cos(y+2))
+    x_sum = sum(i * np.cos((i + 1) * x + i) for i in range(1, 6))
+    y_sum = sum(i * np.cos((i + 1) * y + i) for i in range(1, 6))
+    return x_sum * y_sum
 
 def styblinski_tang(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return (1/78) * 0.5 * (x**4 - 16*x**2 + 5*x + y**4 - 16*y**2 + 5*y)
@@ -169,18 +174,12 @@ def make_csv(
     X = xmin + (X_i / xb) * (xmax - xmin)
     Y = ymin + (Y_i / yb) * (ymax - ymin)
 
-    # avoid csendes singularity at 0
-    if graph_type == "csendes":
-        eps = 1e-12
-        X = np.where(np.isclose(X, 0.0), eps, X)
-        Y = np.where(np.isclose(Y, 0.0), eps, Y)
-
     Z = func(X, Y).astype(float)
 
     # normalize to [0,1]
     z_min = np.nanmin(Z)
     z_max = np.nanmax(Z)
-    if np.isclose(z_max - z_min, 0.0):
+    if z_max == z_min:
         Z_norm = np.zeros_like(Z)
     else:
         Z_norm = (Z - z_min) / (z_max - z_min)
