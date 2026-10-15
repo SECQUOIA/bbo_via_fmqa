@@ -9,13 +9,14 @@ import datetime
 
 # Helper and module imports
 import read_grid
-from ml_surrogate import train_surrogate_model, print_final_equation
+from FM_surrogate import train_surrogate_model, print_final_equation
 from ising_machine import solve_surrogate_dwave
 
 # ============================================================
 #                 LOAD DATASET
 # ============================================================
 # path = "path/to/your/dataset.csv"
+path = os.environ.get("FMQA_DATASET", "./qhd_2D_graphs/alpine1_30x30.csv")
 grid, obj_min, obj_max, x_bound, y_bound = read_grid.load_grid(filename=path)
 print(f"Grid loaded: {len(grid)} points, x in [0,{x_bound}], y in [0,{y_bound}]")
 print(f"Objective range: [{obj_min}, {obj_max}]")

@@ -1,27 +1,36 @@
 import numpy as np
 from fmqa import FMBQM
 
-def train_surrogate_model(xs, ys, num_epoch=1000, learning_rate=1.0e-2):
+def train_surrogate_model(xs, ys, num_epoch=300, learning_rate=1.0e-2, x_vectors=None):
     """
     Trains the Factorization Machine surrogate model on the provided data.
 
     Args:
         xs (list of str): A list of binary strings representing the input points.
         ys (list of float): A list of scaled objective values.
-        num_epoch (int): The number of training epochs.
+        num_epoch (int): The number of training epochs. The default was reduced
+            from 1000 to 300 to lower training time and overfitting risk.
+            Adjust it if convergence quality requires more iterations.
         learning_rate (float): The learning rate for the optimizer.
+        x_vectors (list[list[int]] | np.ndarray | None): Optional precomputed
+            binary feature vectors corresponding to `xs`. If omitted, the
+            vectors are rebuilt from the bitstrings in `xs`.
 
     Returns:
         FMBQM: A trained Factorization Machine Binary Quadratic Model.
     """
     # Convert data to the format required by the FMBQM class
-    x_vectors = [[int(bit) for bit in b] for b in xs]
-    x_vectors_np = np.array(x_vectors, dtype=int)
+    if x_vectors is None:
+        x_vectors = [[int(bit) for bit in b] for b in xs]
+
+    if isinstance(x_vectors, np.ndarray):
+        x_vectors_np = x_vectors.astype(int, copy=False)
+    else:
+        x_vectors_np = np.array(x_vectors, dtype=int)
     y_values_np = np.array(ys)
 
     # Train and return the model
     fm = FMBQM.from_data(x=x_vectors_np, y=y_values_np, num_epoch=num_epoch, learning_rate=learning_rate)
-    
     return fm
 
 def print_final_equation(fm_model):
@@ -50,4 +59,3 @@ def print_final_equation(fm_model):
     # Join all parts for the final equation string
     final_equation = "E = " + " ".join(equation_parts)
     print(final_equation)
-

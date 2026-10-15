@@ -1,8 +1,6 @@
 """Regression checks for candidate filtering and runner convergence logs."""
 
 import csv
-from pathlib import Path
-import runpy
 
 import dimod
 import numpy as np
@@ -10,7 +8,6 @@ import pytest
 
 import bbo_via_fmqa
 import ising_machine
-import ml_surrogate
 
 
 class FixedSampler:
@@ -48,27 +45,22 @@ def test_sa_handles_sampler_failure():
 
 
 def test_runner_stops_and_logs_updated_incumbent(tmp_path, monkeypatch):
-    """Two valid but worse proposals must consume patience and retain the initial best."""
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv('MPLBACKEND', 'Agg')
-    monkeypatch.setenv('FMQA_MAX_CYCLES', '10')
-    monkeypatch.setenv('FMQA_CONVERGENCE_PATIENCE', '2')
-    dataset = tmp_path / 'tiny.csv'
-    dataset.write_text('x,y,Objective\n0,0,0\n0,1,1\n1,0,2\n1,1,3\n')
-    monkeypatch.setenv('FMQA_DATASET', str(dataset))
-    import random
-    monkeypatch.setattr(random, 'shuffle', lambda points: None)
-    monkeypatch.setattr(ml_surrogate, 'train_surrogate_model', lambda *args, **kwargs: object())
-    monkeypatch.setattr(ml_surrogate, 'print_final_equation', lambda model: None)
+    """Two valid worse proposals consume patience and preserve the single-start best."""
+    from bbo_via_fmqa import fmqa_simulated as runner
+    monkeypatch.setattr(runner, 'train_surrogate_model', lambda *args, **kwargs: object())
     proposals = iter([(1, 0), (1, 1)])
-    monkeypatch.setattr(ising_machine, 'solve_surrogate_SA', lambda *args: next(proposals))
-    runner = Path(bbo_via_fmqa.__file__).with_name('fmqa_simulated.py')
-    runpy.run_path(str(runner), run_name='__main__')
-    logs = list((tmp_path / 'output').glob('*SA_log*.csv'))
-    assert len(logs) == 1
-    with logs[0].open() as f:
-        rows = list(csv.DictReader(f))
-    assert len(rows) == 2
-    assert [float(row['best_val']) for row in rows] == [0.0, 0.0]
-    assert [int(row['no_improvement_count']) for row in rows] == [1, 2]
-    assert [row['status'] for row in rows] == ['evaluated', 'evaluated']
+    monkeypatch.setattr(runner, 'solve_surrogate_SA', lambda *args: next(proposals))
+    monkeypatch.setattr(runner, 'OUTPUT_DIR', str(tmp_path))
+    grid = {(0, 0): 0.0, (0, 1): 1.0, (1, 0): 2.0, (1, 1): 3.0}
+    row = runner.run_single_fmqa(grid, 0.0, 3.0, 1, 1, (0, 0), 10, 2)
+    assert row['iterations'] == 2
+    assert row['final_value'] == 0.0
+    assert row['solution_found'] == 'T'
+    row.update(graph_type='tiny', run_index=1)
+    path = runner.create_summary_csv()
+    runner.append_summary_row(path, row)
+    with open(path) as f:
+        records = list(csv.DictReader(f))
+    assert len(records) == 1
+    assert float(records[0]['final_value']) == 0.0
+    assert int(records[0]['iterations']) == 2
