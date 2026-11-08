@@ -21,7 +21,7 @@ please refer to the example code below.
 
 This directory contains the repository's PyTorch port of the original
 [Tsuda Laboratory FMQA model](https://github.com/tsudalab/fmqa).
-Use Python 3.10 or later. From the repository root, follow the environment setup
+Use Python 3.11 or later. From the repository root, follow the environment setup
 in [the main README](../README.md), then install the bundled model with:
 
 ```bash
