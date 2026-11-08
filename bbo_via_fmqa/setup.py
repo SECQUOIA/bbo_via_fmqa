@@ -22,7 +22,7 @@ setup(
         "dwave": ["dwave-system"],
     },
     entry_points={"console_scripts": ["fmqa-generate-grid=qhd_grid_generator:main"]},
-    python_requires=">=3.10",
+    python_requires=">=3.11",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

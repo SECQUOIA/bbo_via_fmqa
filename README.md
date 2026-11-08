@@ -26,7 +26,7 @@ credentials, and service access; the ordinary tests run locally without them.
 
 ## Installation
 
-Python 3.10 or later is required. From a fresh clone, create an isolated
+Python 3.11 or later is required. From a fresh clone, create an isolated
 environment and install both local distributions together:
 
 ```bash
@@ -166,7 +166,7 @@ Tests cover coordinate encoding/decoding, CSV loading, infeasible-point handling
 production scaling, model training and prediction, and local annealing. A broken
 mandatory model import fails collection. Cloud hardware is not exercised.
 
-GitHub Actions runs the tests on Python 3.10–3.13 for pushes to `main` and pull
+GitHub Actions runs the tests on Python 3.11–3.13 for pushes to `main` and pull
 requests targeting `main`. It installs the distributions without editable source
 path overrides and runs tests outside the checkout to exercise the installed
 packages. Each matrix job retains its XML coverage report as a workflow artifact;
